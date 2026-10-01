@@ -160,3 +160,7 @@ python src/review_day1.py
 - [Kaggle 데이터셋](https://www.kaggle.com/datasets/itshpark/data-driven-prediction-of-battery-cycle)
 - [연구진 공개 데이터 로더](https://github.com/rdbraatz/data-driven-prediction-of-battery-cycle-life-before-capacity-degradation)
 - [Severson et al. (2019), Data-driven prediction of battery cycle life before capacity degradation](https://www.nature.com/articles/s41560-019-0356-8)
+
+### 커널과 패키지 확인
+
+노트북 마지막 셀은 현재 커널의 Python 경로와 패키지 버전을 표시합니다. 미설치 패키지는 `미설치`로 표시하며 셀 실행을 중단하지 않습니다. 필요한 패키지는 노트북에서 `%pip install nbformat nbclient`처럼 설치하면 현재 커널에 적용됩니다. 권장 재현 환경은 위의 Python 3.12 / ESS DAY1 커널입니다.
