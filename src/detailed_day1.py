@@ -89,6 +89,8 @@ def analyze(root):
 
 def manuscript(c):
  f=c['cells'];stats=c['stats'].set_index('batch');quality=c['quality'].set_index('batch');corr=c['corr'].pivot(index='feature',columns='batch',values='spearman');gs=c['groupstats'];kn=c['knee'].set_index('batch');red=c['redundancy']
+ ranges=pd.read_csv(c['root']/'results/target_range_by_cohort.csv').set_index('cohort')
+ coverage=pd.read_csv(c['root']/'results/external_target_coverage.csv').set_index('batch')
  pages=[];current=None
  def page(key,title):
   nonlocal current
@@ -113,8 +115,9 @@ def manuscript(c):
  para('탐색 목적','학습 범위와 외부 평가 범위가 얼마나 다른지 확인하고, 짧은 수명이 일부 오류인지 일반적인 배치 특성인지 구분한다. 150~2,300사이클의 같은 축으로 비교한다.')
  img('01_life_distribution.png',165)
  tbl(['배치','중앙값 / 평균','범위','<500','>1000'],[[b,f'{stats.loc[b,"median"]:.1f} / {stats.loc[b,"mean"]:.1f}',f'{stats.loc[b,"min"]:.0f}~{stats.loc[b,"max"]:.0f}',f'{int(stats.loc[b,"short_lt500"])} ({stats.loc[b,"short_lt500"]/stats.loc[b,"n_labeled"]:.1%})',f'{int(stats.loc[b,"long_gt1000"])} ({stats.loc[b,"long_gt1000"]/stats.loc[b,"n_labeled"]:.1%})'] for b in GROUPS],[70,125,85,105,105])
+ tbl(['Batch 1 구분','n','수명 범위','중앙값'],[[label,int(ranges.loc[key,'n']),f"{ranges.loc[key,'life_min']:.0f}~{ranges.loc[key,'life_max']:.0f}",f"{ranges.loc[key,'life_median']:.1f}"] for key,label in [('batch1_eda','전체 EDA'),('batch1_screened','라벨 품질 기준 적용'),('train_cv','최종 Train / CV'),('holdout','Hold-out')]],[180,50,130,130])
  para('관찰·배치 비교','Batch 1은 중앙값 858.5로 중간 수명에 집중한다. Batch 2는 중앙값 472.0이고 71.8%가 500 미만으로, 단수명이 지배적이다. Batch 3는 중앙값 1005.5이고 52.3%가 1000 초과다. 세 배치 모두 오른쪽 꼬리가 있으나 Batch 2·3에서 더 두드러진다.')
- para('시사점 → 전략','Batch 1의 유효 수명 범위는 534~1227이다. Batch 2의 <534 구간과 Batch 3의 >1227 구간은 학습 타깃 범위 밖이므로 해당 구간의 잔차와 MAPE를 별도로 점검한다. 이것이 입력 X의 외삽을 확정하는 것은 아니며, 실제 입력 피처의 지원 범위도 함께 확인해야 한다.')
+ para('시사점 → 전략',f'전체 EDA 46셀의 범위와 최종 Train 29셀의 범위를 구분한다. 최종 Train은 {ranges.loc["train_cv","life_min"]:.0f}~{ranges.loc["train_cv","life_max"]:.0f}사이클이다. 주 분석 대상 Batch 2는 이 범위 아래 {int(coverage.loc["Batch 2","below_train_target"])}셀·위 {int(coverage.loc["Batch 2","above_train_target"])}셀, Batch 3는 위 {int(coverage.loc["Batch 3","above_train_target"])}셀이다. 이 구간의 오차를 따로 보고한다. 이는 타깃 범위 비교이며 입력 X의 외삽 여부는 별도로 점검한다.')
  para('분모와 그룹 정의','비율의 분모는 수명 라벨이 있는 셀 46/39/44개다. EDA의 장·단수명 기준(>1000/<500)과 분류 과제의 기준(≥550/<550)은 다른 정의다. 500~1000은 중간 그룹이다.')
  page('q1_outlier','Q1. 짧은 셀은 왜 짧은가? 이상치와 구분')
  tbl(['배치','배치 내 최단 셀','수명','충전 정책','종료 QD'],[[b,r.cell_id,f'{r.cycle_life:.0f}',r.charging_policy,f'{r.qd_last_valid:.3f} Ah'] for b in GROUPS for _,r in f[f.batch==b].nsmallest(1,'cycle_life').iterrows()],[65,90,60,190,85])
@@ -185,16 +188,16 @@ def manuscript(c):
  page('features','Feature Engineering: 가설에서 선택 기준까지')
  tbl(['피처 묶음','사용할 입력','선정 이유 / 확인할 사항'],[['G0 핵심 기본형','log_var_delta_q','세 배치 일관된 방향, 완료 불확실 제외에도 관계 유지. 먼저 이 신호만으로 기준을 만든다.'],['G1 초기 추세','G0 + qd_slope_10_100','열화 곡선의 국소 추세. 배치별 부호 차이 때문에 추가 효과를 검증한다.'],['G2 충전 조건','G1 + mean_chargetime + c1','정책·실측 조건 보완. 충전 조건이 바뀌는 환경에서도 일반화 가능한지는 미확정.'],['G3 열적 조건','G2 + mean_tavg','온도 영향 후보. Tmax는 중복이 커서 동시에 쓰지 않는다.'],['대체 / 확장 후보','min_delta_q, mean_delta_q, IR 변화, c2, 전환 SOC, 실측 전류','핵심 ΔQ 요약량 교체 또는 정규화 비교. 추가 변수가 필요하다는 근거는 CV로 확인.'],['입력 제외','cycle_life, label550, last_cycle, 전체 knee, 종료 QD, observed_eol_cycle, 배치 ID·셀 ID','타깃 또는 예측 시점 이후 정보, 식별자. 완료 플래그는 라벨 검토용이며 X가 아니다.']],[100,160,230])
  para('선별 절차','G0→G1→G2→G3를 동일한 Batch 1 분할로 비교한다. 후보 집합은 좁게 유지하고 추가로 얻는 CV MAPE 개선과 fold 간 안정성을 확인한다. 개선이 작거나 불안정하면 더 단순한 집합을 선택한다. 실제 최종 집합은 DAY 2 검증 후 확정한다.')
- para('예측 시점과 결측','summary 평균은 cycle≤100, 기울기는 10~100, IR 변화는 1~10 대비 91~100, 실측 전류는 1~5를 사용한다. 결측 대체는 학습 fold 중앙값으로 한다. 결측 표시 피처를 추가할 경우에도 초기 관측에서 계산한 표시만 허용한다.')
+ para('예측 시점과 결측','summary 평균은 1~100, 기울기는 10~100, IR 변화는 1~10 대비 91~100사이클이다. 기존 early_positive_current는 1~5 중 유효 사이클의 샘플 중앙값 평균(Batch 1은 2~5)이다. 새 charge_* 피처는 모든 배치의 공통 2~5사이클 시간 가중 요약이다. 두 정의를 구분하며 결측 대체·결측 지표는 학습 fold의 초기 정보만 사용한다.')
  para('참고 이미지와의 연결','입력 변수의 출처와 가설, 타깃과 입력의 구분, 시계열에서 미래값을 사용하지 않는 기준을 명시했다. 원논문 피처를 무조건 복제하지 않고 이번 데이터의 배치 차이와 라벨 품질을 반영했다.')
  page('task','Regression 선택과 Target 변환 검토')
- tbl(['항목','회귀: 이번 선택','분류: 선택하지 않은 이유'],[['예측 시점 / 타깃','100사이클 / cycle_life 수치','5사이클 / life≥550이면 1'],['정보 활용','ΔQ100−10과 100사이클 요약 사용 가능','ΔQ100−10을 사용하면 시점 위반'],['Batch 1 분포','연속 수명 534~1227 활용','클래스 0/1 = 1/45로 검증 매우 불안정'],['업무 해석','셀별 예상 사이클 수·선별 우선순위','550 기준 통과 여부로 정보가 압축됨']],[100,195,195])
+ tbl(['항목','회귀: 이번 선택','분류: 선택하지 않은 이유'],[['예측 시점 / 타깃','100사이클 / cycle_life 수치','5사이클 / life≥550이면 1'],['정보 활용','ΔQ100−10과 100사이클 요약 사용 가능','ΔQ100−10을 사용하면 시점 위반'],['Batch 1 분포','전체 EDA 534~1227; 최종 Train 534~1054','전체 EDA 클래스 0/1 = 1/45로 불균형'],['업무 해석','셀별 예상 사이클 수·선별 우선순위','550 기준 통과 여부로 정보가 압축됨']],[100,195,195])
  img('12_target_transformation.png',210)
  para('변환 전후 확인',f'원 수명→자연로그 수명의 왜도는 Batch 1 {quality.loc["Batch 1","target_skew"]:.2f}→{quality.loc["Batch 1","log_target_skew"]:.2f}, Batch 2 {quality.loc["Batch 2","target_skew"]:.2f}→{quality.loc["Batch 2","log_target_skew"]:.2f}, Batch 3 {quality.loc["Batch 3","target_skew"]:.2f}→{quality.loc["Batch 3","log_target_skew"]:.2f}다. 로그 후 일부 비대칭은 줄지만 모든 배치가 정규분포가 되는 것은 아니다.')
  para('시사점 → 타깃 처리','Batch 1에서 원 타깃과 log 타깃을 제한된 후보로 비교한다. log 모델은 예측 후 exp로 사이클 단위로 복원하고 원 단위 MAPE·MAE·RMSE로 평가한다. MAPE 최적과 log 제곱오차 최적은 같지 않으므로 변환을 자동 확정하지 않는다. 매출 예시의 Tweedie 분포를 배터리 수명에 그대로 적용하지 않는다.')
  page('models','Modeling Strategy: 데이터 특성에 맞는 후보 모델')
- tbl(['후보','EDA 근거와 알고리즘 관점','복잡도·선택 조건'],[['중앙값 기준 모델','작은 표본에서도 해석 가능한 비교 기준. 배치별 수명 범위 차이의 영향을 확인.','모든 학습 fold의 라벨 중앙값만 사용. 학습 데이터 밖 타깃을 참조하지 않는다.'],['Ridge / ElasticNet','ΔQ 요약량·온도 중복과 46개 이하의 작은 학습 표본. 계수를 정규화해 분산을 줄인다.','중앙값 대체→표준화→정규화 회귀. alpha는 작은 로그 간격 후보, ElasticNet 혼합비도 좁게 비교.'],['Random Forest','충전 조건·온도와 곡선 변화의 비선형 상호작용 가능성. 분할 평균으로 비선형을 표현한다.','깊이·최소 리프 표본을 제한. 타깃 학습 범위 밖으로 직접 외삽하기 어려워 장수명 구간 오차를 확인.'],['얕은 Gradient Boosting','단순 모델에 남는 비선형 잔차를 작은 트리로 순차 보완한다.','깊이 1~2, 적은 트리·낮은 학습률을 제한적으로 비교. 작은 표본에서 튜닝 폭을 넓히지 않는다.']],[105,220,165])
- para('왜 딥러닝·1000차원 곡선 모델을 우선 쓰지 않는가?','학습 독립 표본은 Batch 1 최대 46개이며 라벨 검토 후 더 줄 수 있다. 116,722개 사이클 행이 독립 셀 표본 수를 늘려주지는 않는다. 많은 파라미터나 곡선 포인트로 시작하면 표본 대비 복잡도가 커지고 검증이 불안정해진다.')
+ tbl(['후보','EDA 근거와 알고리즘 관점','복잡도·선택 조건'],[['중앙값 기준 모델','작은 표본에서도 해석 가능한 비교 기준. 배치별 수명 범위 차이의 영향을 확인.','모든 학습 fold의 라벨 중앙값만 사용. 학습 데이터 밖 타깃을 참조하지 않는다.'],['Ridge / ElasticNet','ΔQ 요약량·온도 중복과 Train 29셀(CV 학습 23~24셀). 계수를 정규화해 분산을 줄인다.','중앙값 대체→표준화→정규화 회귀. alpha는 작은 로그 간격 후보, ElasticNet 혼합비도 좁게 비교.'],['Random Forest','충전 조건·온도와 곡선 변화의 비선형 상호작용 가능성. 분할 평균으로 비선형을 표현한다.','깊이·최소 리프 표본을 제한. 타깃 학습 범위 밖으로 직접 외삽하기 어려워 장수명 구간 오차를 확인.'],['얕은 Gradient Boosting','단순 모델에 남는 비선형 잔차를 작은 트리로 순차 보완한다.','깊이 1~2, 적은 트리·낮은 학습률을 제한적으로 비교. 작은 표본에서 튜닝 폭을 넓히지 않는다.']],[105,220,165])
+ para('왜 딥러닝·1000차원 곡선 모델을 우선 쓰지 않는가?','주 분석은 36셀이고, 최종 Train은 29셀·각 CV 학습은 23~24셀이다. 116,722개 사이클 행이 독립 셀 표본 수를 늘려주지는 않는다. 많은 파라미터나 곡선 포인트로 시작하면 표본 대비 복잡도가 커지고 검증이 불안정해진다.')
  para('LightGBM을 반드시 써야 하는가?','참고 이미지의 LightGBM은 매출 데이터의 구체적 선택 예시다. 본 프로젝트에서는 부스팅 계열을 후보로 두되 현재 표본 수에서 정규화 회귀보다 유리하다는 근거가 없다. 추가 라이브러리나 최신 알고리즘 자체를 선정 이유로 삼지 않는다.')
  para('최종 선택 원칙','CV 평균 MAPE가 낮고 fold 간 변동이 작은 후보를 우선한다. 성능 차이가 미미하면 피처 수와 복잡도가 작은 모델을 선택한다. 정규화 회귀도 외삽이 항상 정확한 것은 아니므로 Batch 2·3 평가에서 실제 한계를 보고한다.')
  page('validation','데이터 처리·검증·오류 분석의 구체적 계획')
@@ -205,7 +208,7 @@ def manuscript(c):
  para('오차를 어떻게 해석하는가?','CV 평균과 표준편차, Hold-out, Batch 2·3를 분리한다. Gap은 Valid−CV, Test−Valid, Test−9.1%(%p)로 정의한다. 큰 오차 셀의 수명 구간·충전 정책·초기 곡선·결측 패턴을 확인하고 편향을 설명한다. 이때 외부 타깃으로 다시 튜닝하지 않는다.')
  para('외부 EDA의 한계','DAY 1 요구에 따라 세 배치의 라벨을 이미 관찰했다. 외부 데이터를 완전히 눈가림했다고 주장하지 않는다. 배치별 관찰은 해석과 검증 위험 설명에 사용하고, 실질적인 모델·피처 선택은 Batch 1 학습 부분 안에서 수행한다.')
  page('mapping','EDA Insight → Feature → Modeling Strategy')
- tbl(['관찰한 사실','피처·처리 결정','후보 모델·검증으로 연결'],[['ΔQ log 분산\nρ=-0.871 / -0.709 / -0.797','핵심 G0 피처로 선정. 완료 불확실 제외 민감도 확인.','단일 피처 Ridge부터 시작하고 기준 모델 대비 개선 확인.'],['ΔQ 요약량 |ρ|≈0.95~0.99, 온도 중복 큼','요약량 하나·온도 하나 우선. 확장 시 정규화.','Ridge/ElasticNet 계수·fold 변동 확인.'],['충전시간·초기 기울기의 수명 상관 방향 변함','G1~G3로 하나씩 추가. 조건 의존 후보로 취급.','Batch 1 ablation 비교와 외부 배치 잔차 해석.'],['학습 셀 최대 46개, 라벨 품질 검토 시 36개','1000차원 곡선 대신 작은 요약 피처.','얕은 트리·좁은 튜닝. 딥러닝 우선 제외.'],['Batch 2 단수명 71.8%, Batch 3 장수명 52.3%','배치 ID를 모델 입력으로 넣지 않음. 타깃 구간별 평가.','학습 범위 밖 타깃과 입력 지원 범위를 분리해 점검.'],['초기 용량 일부 증가, knee는 전체 궤적에 의존','전체 knee·종료값 제외. 초기 국소 추세만 후보.','100사이클 시점 준수·누수 차단.'],['완료 불확실 16개, 라벨 결측 10개','별도 품질 플래그·사전 포함 기준.','라벨 검토·평가 n·민감도 분석 공개.']],[170,160,160])
+ tbl(['관찰한 사실','피처·처리 결정','후보 모델·검증으로 연결'],[['ΔQ log 분산\nρ=-0.871 / -0.709 / -0.797','핵심 G0 피처로 선정. 완료 불확실 제외 민감도 확인.','단일 피처 Ridge부터 시작하고 기준 모델 대비 개선 확인.'],['ΔQ 요약량 |ρ|≈0.95~0.99, 온도 중복 큼','요약량 하나·온도 하나 우선. 확장 시 정규화.','Ridge/ElasticNet 계수·fold 변동 확인.'],['충전시간·초기 기울기의 수명 상관 방향 변함','G1~G3로 하나씩 추가. 조건 의존 후보로 취급.','Batch 1 ablation 비교와 외부 배치 잔차 해석.'],['주 분석 36셀 / Train 29셀 / CV 학습 23~24셀','1000차원 곡선 대신 작은 요약 피처.','얕은 트리·좁은 튜닝. 딥러닝 우선 제외.'],['Batch 2 단수명 71.8%, Batch 3 장수명 52.3%','배치 ID를 모델 입력으로 넣지 않음. 타깃 구간별 평가.','학습 범위 밖 타깃과 입력 지원 범위를 분리해 점검.'],['초기 용량 일부 증가, knee는 전체 궤적에 의존','전체 knee·종료값 제외. 초기 국소 추세만 후보.','100사이클 시점 준수·누수 차단.'],['완료 불확실 16개, 라벨 결측 10개','별도 품질 플래그·사전 포함 기준.','라벨 검토·평가 n·민감도 분석 공개.']],[170,160,160])
  para('업무 관점의 활용','예상 총수명은 셀 선별이나 교체 우선순위의 참고 근거가 된다. 셀 간 비교와 초기 열화 신호 탐색이 목적이며, 현재 분석으로 실제 ESS 교체 날짜나 안전 제어를 직접 결정할 수는 없다. 운전 조건 변화·캘린더 열화·시간 단위 수명 변환·불확실성을 검증해야 한다.')
  page('coverage','요구사항 충족 확인·한계·참고 자료')
  tbl(['요구사항','보고서의 근거'],[['Q1 분포·비율·이상치','150~2300 히스토그램, 배치별 분모·비율, IQR와 짧은 실제 셀의 라벨·정책·ΔQ 대조'],['Q2 QD·가속 열화·knee','전체 곡선, 초기 기울기 양수 셀 수, knee 규칙·배치 비교·미래 정보 제외'],['Q3 ΔQ·그룹 비교·통계','실제 사이클 정렬, 그룹 중앙값·IQR 곡선, 없는 단수명 그룹 명시, 요약 피처 수치'],['Q4 정책·고속 충전·전류','정책 평균·SD·n, c1/실측 전류/충전시간의 배치별 상관, 인과 한계'],['Q5 상관·최강 신호·중복','세 배치 상관표, ΔQ 신호의 일관성과 민감도, 변수 중복과 정규화'],['모델 전략 3항목','X/Y와 회귀 선택, 피처 단계적 비교, EDA 근거별 후보 모델·Pipeline·분할 계획']],[160,330])
@@ -285,15 +288,28 @@ def compact_manuscript(c):
  para('열화 곡선의 발견','완만한 감소 뒤 말기 가속이 보이지만 초기 10~100사이클의 기울기가 양수인 셀도 12/23/1개다. 기울기와 수명 상관은 +0.578/-0.271/+0.184다. 초기 기울기는 안정화·측정 조건의 영향도 받아 핵심 ΔQ에 추가 효과를 검증한다.'),
  ('i','15_knee_sensitivity.png',125),
  ('t',['배치','기본 후보 / 전체','knee 중앙값','27설정 모두 탐지','위치 최대 변동 / 기록'],[[b,f'{int(c["knee"].set_index("batch").loc[b,"candidates"])} / {int(c["stats"].set_index("batch").loc[b,"n"])}',f'{c["knee"].set_index("batch").loc[b,"knee_cycle_median"]:.1f}',f'{int(st.set_index("batch").loc[b,"all_settings_detected"])}',f'{st.set_index("batch").loc[b,"max_position_span"]:.1%}'] for b in GROUPS],[65,110,95,110,110]),
- para('민감도 검증 방법','기존 연속 두 직선 탐지에서 평활화 7/11/21점 × SSE 개선율 10/20/30% × 후반/전반 기울기 비율 1.2/1.5/2.0의 27설정을 비교했다. QD 0.80~1.32 Ah, cycle≥10, 기록 15~85% 탐색과 후반 음의 기울기는 동일하다.'),
- para('발견 → 모델 전략','131/139셀은 모든 설정에서 탐지됐다. 허용 설정 사이 위치 범위의 배치별 중앙값은 0%, 최대는 1%/1%/0%다. 다만 탐색 격자 자체가 기록 길이의 1%여서 작은 변화는 분해하지 못한다. 이 범위의 안정성은 물리적 knee 입증이 아니다. 전체 기록·Batch 2 라벨 이후 기록을 쓰므로 knee는 X에서 제외한다.')]
+ para('위치 추정과 채택 규칙의 구분','평활화 7/11/21점마다 위치를 1회 추정한 총 3개 fit에, SSE 개선율 10/20/30% × 기울기 비율 1.2/1.5/2.0의 9개 채택 규칙을 적용했다. 27개는 fit×규칙 조합이며 27번의 독립 위치 추정이 아니다. QD 0.80~1.32 Ah, cycle≥10, 기록 15~85% 탐색과 후반 음의 기울기는 동일하다.'),
+ para('발견 → 모델 전략','131/139셀은 27조합에서 모두 채택됐다. 채택된 fit의 위치 범위는 중앙값 0%, 최대 1%/1%/0%다. 임계값만 바꾸면 위치를 다시 적합하지 않으므로 이 결과는 제한된 평활화·채택 민감도다. 1% 탐색 격자로 더 작은 변동도 분해하지 못하며 다른 탐지법의 일치나 물리적 knee를 입증하지 않는다. 전체 기록·Batch 2 라벨 이후 기록을 쓰므로 knee는 X에서 제외한다.')]
  pages[6]['blocks']=[
  ('i','14_current_pattern_population.png',180),
  ('t',['초기 전류 피처 / 수명 ρ','Batch 1 (n=46)','Batch 2 (n=39)','Batch 3 (n=44)'],[[k,*[f'{rho(k,"cycle_life",b):+.3f}' for b in GROUPS]] for k in ['charge_mean_a','charge_rms_a','charge_p95_a','charge_fraction_gt4a']],[190,100,100,100]),
  para('정의와 추출 품질','Batch 1의 cycle 1에는 유효 충전 구간이 없어 배치 간 같은 관측 창인 실제 cycle 2~5의 4개 곡선을 139셀 모두에서 사용했다. Δt>0이고 양 끝 I>0.1 A인 구간에 중간 전류와 Δt 가중치를 적용했다. 사이클별 시간 가중 평균·RMS·95분위·I>4 A 시간 비율을 계산한 뒤 4사이클 평균했다. A는 C-rate와 다르며 4 A는 탐색 기준이다.'),
  para('발견·열화와 연결',f'RMS-수명 ρ는 {rho("charge_rms_a","cycle_life","Batch 1"):+.3f}/{rho("charge_rms_a","cycle_life","Batch 2"):+.3f}/{rho("charge_rms_a","cycle_life","Batch 3"):+.3f}로 모두 음수지만 강도가 다르다. RMS-초기 QD 기울기도 {rho("charge_rms_a","qd_slope_10_100","Batch 1"):+.3f}/{rho("charge_rms_a","qd_slope_10_100","Batch 2"):+.3f}/{rho("charge_rms_a","qd_slope_10_100","Batch 3"):+.3f}(n=46/47/46)다. 반면 >4 A 비율은 수명 관계의 부호가 바뀐다. 기존 샘플 중앙값과 시간 가중 통계는 다른 요약량이며 단순한 고속충전 인과 설명은 불충분하다.'),
  para('시사점 → 후보 선별','G0 핵심 ΔQ에 RMS를 하나 추가한 G4를 기존 G1~G3와 별도로 비교한다. 평균/RMS/95분위는 서로 중복될 수 있어 동시에 확장하지 않는다. 최종 피처는 Batch 1 학습 CV로 선택하며 외부 상관으로 튜닝하지 않는다. 파형 6개 예시는 노트북에 유지했다.')]
- pages[8]['blocks'].append(para('G4 충전 패턴의 별도 비교',f'G0 + charge_rms_a를 별도로 비교한다. RMS와 ΔQ log 분산의 상관은 {rho("charge_rms_a","log_var_delta_q","Batch 1"):+.3f}/{rho("charge_rms_a","log_var_delta_q","Batch 2"):+.3f}/{rho("charge_rms_a","log_var_delta_q","Batch 3"):+.3f}(n=46/47/46)로 일부 신호가 중복된다. 따라서 추가 예측력은 CV로 검증한다. strategy_checks.model_inputs는 초기 피처 화이트리스트를 강제해 타깃·전체 knee·종료값·식별자를 차단한다.'))
+ intervals=pd.read_csv(root/'results/correlation_uncertainty.csv')
+ def interval(feature,batch):
+  z=intervals[(intervals.feature==feature)&(intervals.batch==batch)].iloc[0]
+  return f'[{z.ci_low:+.3f}, {z.ci_high:+.3f}]'
+ q5=[]
+ for b in pages[7]['blocks']:
+  if b[0]=='i':q5.append(('i','16_correlation_uncertainty.png',155))
+  elif b[0]=='p' and b[1]=='핵심 발견 → 처리':
+   q5.append(para('불확실성 → 피처 결정',f'ΔQ log 분산의 95% 구간은 세 배치 모두 음수다. RMS는 Batch 2 {interval("charge_rms_a","Batch 2")}, Batch 3 {interval("charge_rms_a","Batch 3")}로 0을 포함해 관계 방향을 확정하기 어렵다. 핵심 ΔQ를 유지하고 RMS는 별도 CV 후보로만 비교한다. 중복 ΔQ·온도는 축소하거나 정규화한다.'))
+  elif b[0]=='p' and b[1]=='상관의 한계':
+   q5.append(para('구간 계산과 해석','EDA 유효라벨 46/39/44셀에서 충전정책(c1·전환 SOC·c2) 군을 복원추출하고 군 내부 셀을 함께 유지한 2,000회 부트스트랩(seed=42)의 2.5/97.5백분위다. K=23/9/8군; 6개 구간 모두 유효 반복 2,000회다. 정책군의 교환가능성을 가정한 탐색 구간이며 다중비교 보정·인과·모델 성능 구간이 아니다. 특히 K가 작은 배치는 불확실성이 크다. 단조 중복은 VIF와 구분한다.'))
+  else:q5.append(b)
+ pages[7]['blocks']=q5
+ pages[8]['blocks'].append(para('G4 충전 패턴의 별도 비교',f'G0 + charge_rms_a를 별도로 비교한다. RMS와 ΔQ log 분산의 상관은 {rho("charge_rms_a","log_var_delta_q","Batch 1"):+.3f}/{rho("charge_rms_a","log_var_delta_q","Batch 2"):+.3f}/{rho("charge_rms_a","log_var_delta_q","Batch 3"):+.3f}(n=46/47/46)로 일부 신호가 중복된다. 따라서 Batch 2·3의 RMS 상관 구간은 0을 포함하므로 추가 예측력은 CV로 검증한다. strategy_checks.model_inputs는 초기 피처 화이트리스트를 강제해 타깃·전체 knee·종료값·식별자를 차단한다.'))
  folds=pd.read_csv(root/'results/cv_split_plan.csv')
  pages[11]['blocks']=[
  para('고정한 라벨 정책과 모집단','유효 cycle_life와 종료 유효 QD≤0.885 Ah를 주 분석의 공통 기준으로 고정했다. Batch 1은 36셀·20정책 그룹, Batch 2는 39셀, Batch 3는 44셀이다. 제외 셀은 우측 검열 가능성이 있으므로 수명 결측 대체를 하지 않는다. Batch 1 전체 46셀의 민감도 분석은 주 결과와 별도로 보고하고 유리한 결과로 정책을 바꾸지 않는다.'),
@@ -336,7 +352,7 @@ def build_detailed_report(root):
 def enhance_notebook(root):
  import nbformat
  root=Path(root);c=analyze(root);pages=manuscript(c);upgraded=compact_manuscript(c)
- for key,idx in [('q2_knee',3),('q4_current',6),('validation',11)]:
+ for key,idx in [('q2_knee',3),('q4_current',6),('q5',7),('validation',11)]:
   for page in pages:
    if page['key']==key:page['blocks']=upgraded[idx]['blocks']
  for page in pages:
@@ -372,6 +388,9 @@ def enhance_notebook(root):
  if not any('strategy_checks.run(ROOT)' in x.source for x in nb.cells if x.cell_type=='code'):
   j=next(i for i,x in enumerate(nb.cells) if x.cell_type=='markdown' and x.source.startswith('## 7. 재현 환경'))
   nb.cells[j:j]=[nbformat.v4.new_markdown_cell('## 추가 검증: Knee 민감도·전체 셀 전류·정책 그룹 분할\n\n초기 전류는 저장된 피처를 사용하며 원본부터 다시 추출하려면 `python src/strategy_checks.py --raw-dir data/raw`를 실행합니다. 모델은 학습하지 않습니다.'),nbformat.v4.new_code_cell('import strategy_checks\nchecks = strategy_checks.run(ROOT)\ndisplay(checks["stability"])\ndisplay(checks["correlations"])\ndisplay(pd.DataFrame([checks["plan"]]))\ndisplay(Image(filename=str(ROOT / "results/14_current_pattern_population.png")))\ndisplay(Image(filename=str(ROOT / "results/15_knee_sensitivity.png")))')]
+ for cell in nb.cells:
+  if cell.cell_type=='code' and 'checks = strategy_checks.run(ROOT)' in cell.source and 'correlation_intervals' not in cell.source:
+   cell.source+='\ndisplay(checks["correlation_intervals"])\ndisplay(Image(filename=str(ROOT / "results/16_correlation_uncertainty.png")))'
  nbformat.write(nb,path)
  return path
 

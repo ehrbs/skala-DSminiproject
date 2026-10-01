@@ -181,3 +181,11 @@ python src/strategy_checks.py --raw-dir data/raw
 # 시간 가중·입력 누수·그룹 분리 검증
 python -m unittest discover -s tests
 ```
+
+### 관측 범위와 상관 불확실성
+
+전체 Batch 1 EDA는 46셀·534~1227사이클, 라벨 품질 적용 후는 36셀·534~1074사이클이며, 최종 Train/CV는 29셀·534~1054사이클입니다. 외부 타깃 구간별 오차는 최종 Train을 기준으로 해석합니다(`results/target_range_by_cohort.csv`, `external_target_coverage.csv`).
+
+기존 `early_positive_current`는 1~5사이클 중 유효 사이클의 샘플 중앙값 평균이고, 새 `charge_*`는 공통 2~5사이클의 시간 가중 피처입니다. Knee의 27설정은 3개 평활화별 위치 fit에 9개 채택 규칙을 적용한 조합이며 독립적인 27개 위치 추정이 아닙니다.
+
+핵심 ΔQ와 RMS의 상관 구간은 정책군 단위 2,000회 부트스트랩으로 계산했습니다(`results/correlation_uncertainty.csv`). ΔQ의 구간은 세 배치 모두 음수이고 RMS는 Batch 2·3에서 0을 포함합니다. 작은 정책군 수와 교환가능성 가정에 의존하는 탐색 구간이며 인과관계·새 배치 일반화·모델 성능을 입증하지 않습니다.

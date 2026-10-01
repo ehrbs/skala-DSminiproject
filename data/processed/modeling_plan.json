@@ -10,6 +10,8 @@
   "cv_folds": 5,
   "seed": 42,
   "policy_overlap": 0,
+  "train_target_min": 534.0,
+  "train_target_max": 1054.0,
   "test2_n": 39,
   "optional_test3_n": 44,
   "input_whitelist": [

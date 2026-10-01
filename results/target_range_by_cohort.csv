@@ -1,0 +1,5 @@
+cohort,n,life_min,life_max,life_median
+batch1_eda,46,534.0,1227.0,858.5
+batch1_screened,36,534.0,1074.0,772.5
+train_cv,29,534.0,1054.0,757.0
+holdout,7,636.0,1074.0,870.0
