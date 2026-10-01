@@ -1,0 +1,47 @@
+{
+  "label_policy": "Finite cycle_life and terminal QD <=0.885 Ah; no terminal QD is input. Same screen across batches.",
+  "batch1_main_n": 36,
+  "batch1_sensitivity_n": 46,
+  "batch1_groups": 20,
+  "train_n": 29,
+  "holdout_n": 7,
+  "train_groups": 16,
+  "holdout_groups": 4,
+  "cv_folds": 5,
+  "seed": 42,
+  "policy_overlap": 0,
+  "test2_n": 39,
+  "optional_test3_n": 44,
+  "input_whitelist": [
+    "log_var_delta_q",
+    "min_delta_q",
+    "mean_delta_q",
+    "qd_slope_10_100",
+    "mean_qd",
+    "std_qd",
+    "mean_ir",
+    "delta_ir",
+    "mean_tavg",
+    "mean_tmax",
+    "mean_chargetime",
+    "c1",
+    "soc_switch",
+    "c2",
+    "early_positive_current",
+    "charge_mean_a",
+    "charge_rms_a",
+    "charge_p95_a",
+    "charge_fraction_gt4a"
+  ],
+  "primary_feature_sequence": [
+    "log_var_delta_q",
+    "qd_slope_10_100",
+    "mean_chargetime",
+    "c1",
+    "mean_tavg"
+  ],
+  "current_extension": [
+    "charge_rms_a"
+  ],
+  "models_trained": false
+}

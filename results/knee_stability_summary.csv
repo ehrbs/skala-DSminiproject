@@ -1,0 +1,4 @@
+batch,n,all_settings_detected,median_acceptance,median_position_span,max_position_span
+Batch 1,46,43,1.0,0.0,0.009999999999999969
+Batch 2,47,43,1.0,0.0,0.009999999999999827
+Batch 3,46,45,1.0,0.0,0.0

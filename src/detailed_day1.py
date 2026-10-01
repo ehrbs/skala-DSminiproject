@@ -227,7 +227,7 @@ def markdown(pages,images=True):
     lines+=['']
  return '\n'.join(lines)
 
-def compact_manuscript(c):
+def base_compact_manuscript(c):
  """Twelve-page submission; detailed notebook and manuscript remain available."""
  old={p['key']:p for p in manuscript(c)};pages=[]
  def select(key,labels=None,images=True,tables=True,height=None):
@@ -272,8 +272,44 @@ def compact_manuscript(c):
   para('재현 자료와 출처','전체 해석·통계는 상세 원고와 실행 노트북에 보존했다. 실습: actually-war-1ea.notion.site/DS-Mini-Project-32d7f4c8669380338a27f90c471c1fcb\n데이터: kaggle.com/datasets/itshpark/data-driven-prediction-of-battery-cycle\n로더: github.com/rdbraatz/data-driven-prediction-of-battery-cycle-life-before-capacity-degradation\nSeverson et al. (2019), Nature Energy. DOI: 10.1038/s41560-019-0356-8')])
  return pages
 
+def compact_manuscript(c):
+ pages=base_compact_manuscript(c);root=c['root']
+ st=pd.read_csv(root/'results/knee_stability_summary.csv')
+ cor=pd.read_csv(root/'results/current_pattern_correlations.csv')
+ plan=json.loads((root/'data/processed/modeling_plan.json').read_text())
+ def para(label,text):return ('p',label,text)
+ def rho(feature,target,batch):return cor[(cor.feature==feature)&(cor.target==target)&(cor.batch==batch)].spearman.iloc[0]
+ pages[0]['blocks'].insert(0,para('제출자','울산캠퍼스 4반 | 윤도균'))
+ pages[3]['blocks']=[
+ ('i','02_degradation.png',165),
+ para('열화 곡선의 발견','완만한 감소 뒤 말기 가속이 보이지만 초기 10~100사이클의 기울기가 양수인 셀도 12/23/1개다. 기울기와 수명 상관은 +0.578/-0.271/+0.184다. 초기 기울기는 안정화·측정 조건의 영향도 받아 핵심 ΔQ에 추가 효과를 검증한다.'),
+ ('i','15_knee_sensitivity.png',125),
+ ('t',['배치','기본 후보 / 전체','knee 중앙값','27설정 모두 탐지','위치 최대 변동 / 기록'],[[b,f'{int(c["knee"].set_index("batch").loc[b,"candidates"])} / {int(c["stats"].set_index("batch").loc[b,"n"])}',f'{c["knee"].set_index("batch").loc[b,"knee_cycle_median"]:.1f}',f'{int(st.set_index("batch").loc[b,"all_settings_detected"])}',f'{st.set_index("batch").loc[b,"max_position_span"]:.1%}'] for b in GROUPS],[65,110,95,110,110]),
+ para('민감도 검증 방법','기존 연속 두 직선 탐지에서 평활화 7/11/21점 × SSE 개선율 10/20/30% × 후반/전반 기울기 비율 1.2/1.5/2.0의 27설정을 비교했다. QD 0.80~1.32 Ah, cycle≥10, 기록 15~85% 탐색과 후반 음의 기울기는 동일하다.'),
+ para('발견 → 모델 전략','131/139셀은 모든 설정에서 탐지됐다. 허용 설정 사이 위치 범위의 배치별 중앙값은 0%, 최대는 1%/1%/0%다. 다만 탐색 격자 자체가 기록 길이의 1%여서 작은 변화는 분해하지 못한다. 이 범위의 안정성은 물리적 knee 입증이 아니다. 전체 기록·Batch 2 라벨 이후 기록을 쓰므로 knee는 X에서 제외한다.')]
+ pages[6]['blocks']=[
+ ('i','14_current_pattern_population.png',180),
+ ('t',['초기 전류 피처 / 수명 ρ','Batch 1 (n=46)','Batch 2 (n=39)','Batch 3 (n=44)'],[[k,*[f'{rho(k,"cycle_life",b):+.3f}' for b in GROUPS]] for k in ['charge_mean_a','charge_rms_a','charge_p95_a','charge_fraction_gt4a']],[190,100,100,100]),
+ para('정의와 추출 품질','Batch 1의 cycle 1에는 유효 충전 구간이 없어 배치 간 같은 관측 창인 실제 cycle 2~5의 4개 곡선을 139셀 모두에서 사용했다. Δt>0이고 양 끝 I>0.1 A인 구간에 중간 전류와 Δt 가중치를 적용했다. 사이클별 시간 가중 평균·RMS·95분위·I>4 A 시간 비율을 계산한 뒤 4사이클 평균했다. A는 C-rate와 다르며 4 A는 탐색 기준이다.'),
+ para('발견·열화와 연결',f'RMS-수명 ρ는 {rho("charge_rms_a","cycle_life","Batch 1"):+.3f}/{rho("charge_rms_a","cycle_life","Batch 2"):+.3f}/{rho("charge_rms_a","cycle_life","Batch 3"):+.3f}로 모두 음수지만 강도가 다르다. RMS-초기 QD 기울기도 {rho("charge_rms_a","qd_slope_10_100","Batch 1"):+.3f}/{rho("charge_rms_a","qd_slope_10_100","Batch 2"):+.3f}/{rho("charge_rms_a","qd_slope_10_100","Batch 3"):+.3f}(n=46/47/46)다. 반면 >4 A 비율은 수명 관계의 부호가 바뀐다. 기존 샘플 중앙값과 시간 가중 통계는 다른 요약량이며 단순한 고속충전 인과 설명은 불충분하다.'),
+ para('시사점 → 후보 선별','G0 핵심 ΔQ에 RMS를 하나 추가한 G4를 기존 G1~G3와 별도로 비교한다. 평균/RMS/95분위는 서로 중복될 수 있어 동시에 확장하지 않는다. 최종 피처는 Batch 1 학습 CV로 선택하며 외부 상관으로 튜닝하지 않는다. 파형 6개 예시는 노트북에 유지했다.')]
+ pages[8]['blocks'].append(para('G4 충전 패턴의 별도 비교',f'G0 + charge_rms_a를 별도로 비교한다. RMS와 ΔQ log 분산의 상관은 {rho("charge_rms_a","log_var_delta_q","Batch 1"):+.3f}/{rho("charge_rms_a","log_var_delta_q","Batch 2"):+.3f}/{rho("charge_rms_a","log_var_delta_q","Batch 3"):+.3f}(n=46/47/46)로 일부 신호가 중복된다. 따라서 추가 예측력은 CV로 검증한다. strategy_checks.model_inputs는 초기 피처 화이트리스트를 강제해 타깃·전체 knee·종료값·식별자를 차단한다.'))
+ folds=pd.read_csv(root/'results/cv_split_plan.csv')
+ pages[11]['blocks']=[
+ para('고정한 라벨 정책과 모집단','유효 cycle_life와 종료 유효 QD≤0.885 Ah를 주 분석의 공통 기준으로 고정했다. Batch 1은 36셀·20정책 그룹, Batch 2는 39셀, Batch 3는 44셀이다. 제외 셀은 우측 검열 가능성이 있으므로 수명 결측 대체를 하지 않는다. Batch 1 전체 46셀의 민감도 분석은 주 결과와 별도로 보고하고 유리한 결과로 정책을 바꾸지 않는다.'),
+ ('t',['구분','셀 수','충전 정책 그룹','역할'],[['Train / CV',plan['train_n'],plan['train_groups'],'후보·피처·파라미터 선택'],['Valid / Hold-out',plan['holdout_n'],plan['holdout_groups'],'선택 후 1회 내부 평가'],['Test / Batch 2',plan['test2_n'],9,'필수 외부 평가'],['Batch 3',plan['optional_test3_n'],8,'선택 추가 평가']],[120,60,120,190]),
+ para('실제 분할 가능성 확인',f'c1·전환 SOC·c2 수치 조합으로 정책을 묶어 newstructure 접미사 차이를 같은 그룹으로 처리했다. GroupShuffleSplit(test_size=0.2, seed=42)로 29/7셀, 16/4그룹을 고정했다. Train에서 GroupKFold 5개 검증 fold는 각각 {"/".join(str(int(x)) for x in folds.valid_cells)}셀이다. Hold-out/CV 모두 정책 그룹 중복 0이며 셀별 배정 CSV와 fold 통계를 저장했다.'),
+ para('Pipeline·선택 기준','각 학습 fold만으로 결측 중앙값·선형 모델 표준화·피처 선택·튜닝을 수행한다. G0~G3 및 별도 G4, 원 타깃/log 타깃을 제한된 후보로 비교한다. CV 평균 MAPE와 fold 표준편차를 함께 보고하며 유사하면 더 단순한 모델을 택한다. Hold-out은 선택에 사용하지 않는다.'),
+ para('지표와 오차 분석','CV 평균·표준편차, Hold-out, Batch 2를 분리하고 MAPE·MAE·RMSE를 원 사이클 단위로 평가한다. log 예측은 exp로 복원한다. Gap=Valid−CV/Test−Valid/Test−9.1%(%p)로 정의한다. 학습 수명 범위 밖 구간·충전 정책·결측별 잔차를 점검한다. 외부 오차를 보고 재튜닝하지 않는다.'),
+ para('한계와 주장 범위','Hold-out 7셀·fold 5~6셀이라 평가 변동이 클 수 있다. 종료 기준으로 라벨 진실성이 확정되는 것은 아니며 모집단 선택 편향도 남는다. 세 배치 EDA·Batch 1 전체 라벨을 이미 보아 완전한 눈가림 검증은 아니다. 모델 학습은 DAY 2이며 9.1%는 달성 성능이 아니다. 실험실 셀에서 실제 ESS로 적용하려면 추가 운전 조건·불확실성 검증이 필요하다.'),
+ para('자료·출처','재현 코드: src/strategy_checks.py, 실행 노트북, data/processed, results. 실습: actually-war-1ea.notion.site/DS-Mini-Project-32d7f4c8669380338a27f90c471c1fcb\n데이터: kaggle.com/datasets/itshpark/data-driven-prediction-of-battery-cycle\n로더: github.com/rdbraatz/data-driven-prediction-of-battery-cycle-life-before-capacity-degradation\nSeverson et al. (2019), Nature Energy. DOI: 10.1038/s41560-019-0356-8')]
+ return pages
+
 def build_detailed_report(root):
- root=Path(root);c=analyze(root);pages=compact_manuscript(c)
+ root=Path(root)
+ import strategy_checks
+ strategy_checks.run(root)
+ c=analyze(root);pages=compact_manuscript(c)
  pdfmetrics.registerFont(TTFont('ESSKorean',FONT))
  styles={k:ParagraphStyle(k,fontName='ESSKorean',fontSize=size,leading=lead,textColor=colors.HexColor("#"+color),spaceAfter=after,wordWrap='CJK',keepWithNext=k in ['title','label']) for k,size,lead,color,after in [('title',18,25,'15304b',12),('label',11,16,'137d80',5),('body',9.5,14.5,'15304b',9),('small',8.2,12,'15304b',0)]}
  def p(text,style):return Paragraph(html.escape(str(text)).replace('\n','<br/>'),styles[style])
@@ -299,7 +335,15 @@ def build_detailed_report(root):
 
 def enhance_notebook(root):
  import nbformat
- root=Path(root);pages=manuscript(analyze(root));lookup={p['key']:p for p in pages};path=root/'notebooks/01_EDA.ipynb';nb=nbformat.read(path,4)
+ root=Path(root);c=analyze(root);pages=manuscript(c);upgraded=compact_manuscript(c)
+ for key,idx in [('q2_knee',3),('q4_current',6),('validation',11)]:
+  for page in pages:
+   if page['key']==key:page['blocks']=upgraded[idx]['blocks']
+ for page in pages:
+  if page['key']=='features':page['blocks']=upgraded[8]['blocks']
+  if page['key']=='q4_profiles':page['blocks']=[b for b in page['blocks'] if not (b[0]=='p' and b[1]=='시사점 → 패턴 피처')]
+ (root/'report/DAY1_모델전략_상세.md').write_text(markdown(pages))
+ lookup={p['key']:p for p in pages};path=root/'notebooks/01_EDA.ipynb';nb=nbformat.read(path,4)
  def text(keys):return markdown([lookup[k] for k in keys],images=False)
  for cell in nb.cells:
   if cell.cell_type=='markdown':
@@ -325,6 +369,9 @@ def enhance_notebook(root):
  if not any('12_target_transformation.png' in c.source for c in nb.cells if c.cell_type=='code'):
   j=next(i for i,c in enumerate(nb.cells) if c.cell_type=='markdown' and c.source.startswith('## 7. 재현 환경'))
   nb.cells.insert(j,nbformat.v4.new_code_cell('display(Image(filename=str(ROOT / "results/12_target_transformation.png")))'))
+ if not any('strategy_checks.run(ROOT)' in x.source for x in nb.cells if x.cell_type=='code'):
+  j=next(i for i,x in enumerate(nb.cells) if x.cell_type=='markdown' and x.source.startswith('## 7. 재현 환경'))
+  nb.cells[j:j]=[nbformat.v4.new_markdown_cell('## 추가 검증: Knee 민감도·전체 셀 전류·정책 그룹 분할\n\n초기 전류는 저장된 피처를 사용하며 원본부터 다시 추출하려면 `python src/strategy_checks.py --raw-dir data/raw`를 실행합니다. 모델은 학습하지 않습니다.'),nbformat.v4.new_code_cell('import strategy_checks\nchecks = strategy_checks.run(ROOT)\ndisplay(checks["stability"])\ndisplay(checks["correlations"])\ndisplay(pd.DataFrame([checks["plan"]]))\ndisplay(Image(filename=str(ROOT / "results/14_current_pattern_population.png")))\ndisplay(Image(filename=str(ROOT / "results/15_knee_sensitivity.png")))')]
  nbformat.write(nb,path)
  return path
 
