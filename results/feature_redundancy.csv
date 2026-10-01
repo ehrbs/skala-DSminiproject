@@ -1,0 +1,16 @@
+batch,feature1,feature2,n,spearman
+Batch 1,log_var_delta_q,min_delta_q,46,-0.9866790009250693
+Batch 1,log_var_delta_q,mean_delta_q,46,-0.9708911501695959
+Batch 1,min_delta_q,mean_delta_q,46,0.9887758248535307
+Batch 1,mean_tavg,mean_tmax,46,0.950786308973173
+Batch 1,c1,soc_switch,46,-0.8693980367363805
+Batch 2,log_var_delta_q,min_delta_q,47,-0.982076780758557
+Batch 2,log_var_delta_q,mean_delta_q,47,-0.9669287696577242
+Batch 2,min_delta_q,mean_delta_q,47,0.9502775208140611
+Batch 2,mean_tavg,mean_tmax,46,0.7593586185630588
+Batch 2,c1,soc_switch,43,-0.23864235748990456
+Batch 3,log_var_delta_q,min_delta_q,46,-0.981745297563984
+Batch 3,log_var_delta_q,mean_delta_q,46,-0.971754548257786
+Batch 3,min_delta_q,mean_delta_q,46,0.9847055195806351
+Batch 3,mean_tavg,mean_tmax,46,0.9748381128584644
+Batch 3,c1,soc_switch,46,-0.6486089414497375

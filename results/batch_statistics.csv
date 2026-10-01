@@ -1,0 +1,4 @@
+batch,n,n_labeled,label_missing,min,median,mean,max,short_lt500,long_gt1000,label0_lt550,label1_ge550,eol_not_observed,delta_usable,knee_candidates,policy_count
+Batch 1,46,46,0,534.0,858.5,844.7173913043479,1227.0,0,10,1,45,10,46,45,23
+Batch 2,47,39,8,392.0,472.0,565.7435897435897,1186.0,28,3,30,9,4,47,44,20
+Batch 3,46,44,2,541.0,1005.5,1059.659090909091,1935.0,0,23,1,43,2,46,46,8

@@ -1,0 +1,7 @@
+cell_id,batch,example_group,cycle_life,charging_policy,cycle,points,positive_current_max
+b1c20,Batch 1,Lower-life example,534.0,5.4C(80%)-5.4C,5,1088,5.404822636363636
+b1c5,Batch 1,Higher-life example,1074.0,4.4C(80%)-4.4C,5,1059,4.402100818181818
+b2c19,Batch 2,Lower-life example,392.0,6C(60%)-3C,5,1003,6.0032168181818175
+b2c34,Batch 2,Higher-life example,1186.0,5.6C(26%)-4.5C-newstructure,5,742,5.605961181818182
+b3c28,Batch 3,Lower-life example,541.0,3.7C(31%)-5.9C-newstructure,5,776,5.902488
+b3c38,Batch 3,Higher-life example,1935.0,5C(67%)-4C-newstructure,5,754,5.003648272727272
