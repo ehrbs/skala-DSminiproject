@@ -1,0 +1,18 @@
+{
+  "candidate_id": "G0_delta__Ridge__alpha=0.1__raw",
+  "feature_set": "G0_delta",
+  "features": [
+    "log_var_delta_q"
+  ],
+  "model": "Ridge",
+  "settings": "alpha=0.1",
+  "target_scale": "raw",
+  "selection": "lowest mean fixed-fold Batch 1 train CV MAPE; tie by SD, feature count, model order",
+  "baseline_cv_mape_pct": 17.080642923736853,
+  "batch2_mape_policy_cluster_ci95": [
+    17.897983416572828,
+    35.17609031599845
+  ],
+  "batch2_bootstrap_repetitions": 2000,
+  "models_compared": 80
+}
