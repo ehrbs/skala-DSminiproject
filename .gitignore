@@ -17,7 +17,6 @@ __pycache__/
 .cache/
 .jupyter/
 .ipython/
-/src/execute_notebook.py
 
 # Local editor and OS files.
 .vscode/
