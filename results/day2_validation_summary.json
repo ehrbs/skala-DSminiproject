@@ -1,0 +1,16 @@
+{
+  "nested_mape_mean_pct": 15.35078309165325,
+  "nested_mape_sd_pct": 12.703594466313456,
+  "nested_oof_mape_pct": 15.540051304457002,
+  "nested_baseline_mean_pct": 17.080642923736853,
+  "nested_group_choices": {
+    "G0_delta": 4,
+    "G3_thermal": 1
+  },
+  "batch2_baseline_improvement_ci95_pctp": [
+    23.465667041905093,
+    47.818156480306385
+  ],
+  "fixed_winner_unchanged": "G0_delta__Ridge__alpha=0.1__raw",
+  "external_results_used_for_reselection": false
+}

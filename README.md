@@ -95,6 +95,14 @@ Batch 2에서 실제 수명이 학습 29셀의 범위인 534~1054사이클보다
 
 [DAY 2 실행 노트북](notebooks/03_modeling.ipynb)과 [모델 평가 보고서](report/DAY2_모델평가.md)에 후보 비교, 고정 분할, 오류 상위 셀, ESS 해석과 한계를 수록했습니다. 제출용 성능표는 [`results/model_performance.csv`](results/model_performance.csv), 후보별·셀별 상세 수치는 `results/day2_*.csv`에서 확인할 수 있습니다.
 
+### 추가 검증으로 확인한 신뢰성과 적용 범위
+
+후보 선택을 내부 분할에서 반복한 **중첩 정책 그룹 CV는 15.35 ± 12.70%**였습니다. 기존 7.93%는 후보 선택에 사용한 CV 점수이며, 중첩 결과는 작은 표본에서 선택이 불안정함을 보여줍니다. 5개 outer fold 중 4개는 G0를 선택했고, G3가 선택된 한 fold는 MAPE 36.74%로 실패했습니다. DAY 1 피처 탐색까지 중첩한 것은 아니므로 독립 외부 시험을 대신하지 않습니다.
+
+동일한 Ridge 설정에서 G0~G4 입력만 바꾼 결과, G1~G3는 G0보다 평균 CV MAPE가 악화했고 G4는 5개 fold 중 2개에서만 개선했습니다. Batch 2에서 모델은 학습 중앙값 기준 MAPE 58.73%를 25.69%로 낮췄지만, 실제 단수명(<500) 셀 28개 중 21개(75%)를 경고하지 못했습니다. **현재 모델은 ESS 단수명 선별·보증·안전 판단에 직접 사용할 수 없습니다.**
+
+추가 분석은 기존 모델을 고정한 상태에서 수행했습니다. 입력 분포 차이, 기존/신규 충전정책, 라벨 제외 기준, Hold-out 포함 재학습의 영향과 후속 실험 조건은 [DAY 2 보고서](report/DAY2_모델평가.md)의 7~10절에 있습니다. 새로운 독립 시험 데이터는 확보하지 못했습니다.
+
 ## 5. 프로젝트 구조
 
 ```text
@@ -113,6 +121,8 @@ Batch 2에서 실제 수명이 학습 29셀의 범위인 534~1054사이클보다
 │   ├── preprocess.py            # 가공 데이터 결합·고정 분할 검증
 │   ├── features.py              # 초기 피처 묶음·화이트리스트
 │   ├── train.py                 # 고정 분할 CV, 모델 학습·외부 평가
+│   ├── evaluation.py            # 중첩 검증·피처 비교·위험 및 배치 진단
+│   ├── predict.py               # 저장 모델로 초기 피처 CSV 예측
 │   ├── eda.py                   # 원본 로딩·피처 계산·시각화
 │   ├── build_deliverables.py     # 보고서·노트북 생성
 │   ├── detailed_day1.py          # 질문별 추가 통계·상세 모델 전략 보고서
@@ -146,6 +156,16 @@ python -m ipykernel install --user --name ess-day1 --display-name "ESS DAY1"
 ```
 
 Windows에서는 가상환경 활성화 명령을 `.venv\Scripts\activate`로 변경합니다. VS Code 또는 Jupyter에서 노트북을 열고 **ESS DAY1** 커널을 선택한 뒤 전체 셀을 실행합니다. DAY 2 전체 결과는 프로젝트 루트에서 `python src/train.py --root .`로 재생성할 수도 있습니다.
+
+### 저장 모델로 새 셀 예측
+
+`python src/train.py --root .`는 중첩 검증·진단 보고서와 함께 `results/day2_model.joblib` 및 입력·학습 셀·패키지 버전을 기록한 manifest를 생성합니다. 새 CSV는 초기 100사이클까지의 측정으로 계산한 `log_var_delta_q`를 포함해야 합니다. 선택적으로 `cell_id`를 넣을 수 있습니다.
+
+```bash
+python src/predict.py --root . --input new_cell_features.csv --output results/new_predictions.csv
+```
+
+결과는 총수명 예측(`predicted_cycle_life`)이며 100사이클 이후의 잔여수명과는 다릅니다. 학습에 사용한 환경과 다른 운전 조건에서는 별도 검증이 필요합니다.
 
 ### 가공 데이터로 실행
 
@@ -205,7 +225,7 @@ python src/review_day1.py
 python src/strategy_checks.py
 # 원본의 공통 초기 사이클에서 전류 피처 재추출
 python src/strategy_checks.py --raw-dir data/raw
-# 시간 가중·입력 누수·그룹 분리 검증
+# 시간 가중·입력 누수·그룹 분리·중첩 CV·저장 모델 검증 (14개)
 python -m unittest discover -s tests
 ```
 

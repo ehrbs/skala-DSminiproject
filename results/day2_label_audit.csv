@@ -1,0 +1,4 @@
+batch,all_n,missing_or_invalid_label_n,valid_label_eol_uncertain_n,main_cohort_n
+Batch 1,46,0,10,36
+Batch 2,47,8,0,39
+Batch 3,46,2,0,44

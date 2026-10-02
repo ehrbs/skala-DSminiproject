@@ -1,0 +1,6 @@
+outer_fold,train_n,valid_n,chosen_candidate,chosen_feature_set,inner_selection_mape_pct,outer_mape_pct,baseline_mape_pct
+1,23,6,"G0_delta__ElasticNet__alpha=0.01,l1=0.5__raw",G0_delta,8.219112813484609,6.052819718123044,15.783401409579406
+2,23,6,"G0_delta__ElasticNet__alpha=0.01,l1=0.5__raw",G0_delta,8.25952412297997,7.069579965528934,13.30356947658147
+3,23,6,G3_thermal__Ridge__alpha=0.1__log,G3_thermal,6.921387670520115,36.74130350091335,14.359391028654997
+4,23,6,"G0_delta__RandomForest__depth=3,leaf=2__raw",G0_delta,6.796053137822373,17.028207353356454,17.757429855298763
+5,24,5,"G0_delta__ElasticNet__alpha=0.01,l1=0.5__log",G0_delta,8.195044720623578,9.862004920344472,24.19942284856964

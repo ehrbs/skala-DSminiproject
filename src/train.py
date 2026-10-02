@@ -232,6 +232,8 @@ def write_report(root, winner, candidate, baseline, performance, pred, ci):
 def run(root):
     root = Path(root)
     results = root / "results"
+    results.mkdir(parents=True, exist_ok=True)
+    (root / "report").mkdir(parents=True, exist_ok=True)
     train, holdout, external, plan = load_data(root)
     baseline = baseline_cv(train)
     baseline.to_csv(results / "day2_baseline_folds.csv", index=False)
@@ -304,9 +306,11 @@ def run(root):
     }, ensure_ascii=False, indent=2))
     save_plots(root, pred)
     write_report(root, winner, candidates, baseline, performance, pred, ci)
+    from evaluation import run_diagnostics
+    diagnostics = run_diagnostics(root, train, holdout, external, specs, winner, pred)
     print("Selected:", winner_id)
     print(performance.to_string(index=False))
-    return {"winner": winner, "candidates": candidates, "performance": performance, "predictions": pred}
+    return {"winner": winner, "candidates": candidates, "performance": performance, "predictions": pred, "diagnostics": diagnostics}
 
 
 if __name__ == "__main__":
