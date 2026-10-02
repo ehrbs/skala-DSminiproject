@@ -93,7 +93,7 @@ DAY 1 EDA에서 세 배치의 수명 라벨과 분포를 이미 관찰했으므�
 
 Batch 2에서 실제 수명이 학습 29셀의 범위인 534~1054사이클보다 짧은 셀은 30/39개입니다. 이 30셀의 MAPE는 28.76%이고, 평균적으로 수명을 **129사이클 과대 예측**했습니다. 반면 Batch 3에서는 학습 수명 상한보다 긴 17셀을 평균적으로 231사이클 과소 예측했습니다. 핵심 ΔQ 입력이 Batch 1 학습 범위 안에 있는 Batch 2의 21셀에서도 MAPE가 35.71%여서, 단순한 입력 외삽만으로 설명할 수 없습니다. 이 결과는 배치와 수명 구간이 바뀔 때 예측의 편향이 달라짐을 보여줍니다. 실제 ESS 선별에 적용하기 전에 더 다양한 운전 조건과 짧은 수명 셀을 추가로 검증해야 합니다.
 
-[DAY 2 실행 노트북](notebooks/02_Modeling.ipynb)과 [모델 평가 보고서](report/DAY2_모델평가.md)에 후보 비교, 고정 분할, 오류 상위 셀, ESS 해석과 한계를 수록했습니다. 후보별·셀별 수치는 `results/day2_*.csv`에서 확인할 수 있습니다.
+[DAY 2 실행 노트북](notebooks/03_modeling.ipynb)과 [모델 평가 보고서](report/DAY2_모델평가.md)에 후보 비교, 고정 분할, 오류 상위 셀, ESS 해석과 한계를 수록했습니다. 제출용 성능표는 [`results/model_performance.csv`](results/model_performance.csv), 후보별·셀별 상세 수치는 `results/day2_*.csv`에서 확인할 수 있습니다.
 
 ## 5. 프로젝트 구조
 
@@ -103,18 +103,22 @@ Batch 2에서 실제 수명이 학습 29셀의 범위인 534~1054사이클보다
 ├── requirements.txt
 ├── notebooks/
 │   ├── 01_EDA.ipynb              # 실행 결과와 해석이 포함된 EDA
-│   └── 02_Modeling.ipynb         # DAY 2 학습, 평가, 오류 분석
+│   ├── 02_feature_engineering.ipynb # 초기 피처 후보와 누수 점검
+│   └── 03_modeling.ipynb         # DAY 2 학습, 평가, 오류 분석
 ├── data/
+│   ├── README.md                # 원본·가공 데이터 안내
 │   ├── raw/                     # 원본 MAT 저장 위치
 │   └── processed/               # 셀 피처, 사이클 요약, 전압별 곡선
 ├── src/
+│   ├── preprocess.py            # 가공 데이터 결합·고정 분할 검증
+│   ├── features.py              # 초기 피처 묶음·화이트리스트
+│   ├── train.py                 # 고정 분할 CV, 모델 학습·외부 평가
 │   ├── eda.py                   # 원본 로딩·피처 계산·시각화
 │   ├── build_deliverables.py     # 보고서·노트북 생성
 │   ├── detailed_day1.py          # 질문별 추가 통계·상세 모델 전략 보고서
 │   ├── strategy_checks.py       # Knee 민감도·초기 전류·고정 분할·입력 제한
 │   ├── review_day1.py            # 원본과 분석 결과의 독립 대조
-│   └── day2_modeling.py          # 고정 분할 CV, 모델 학습·외부 평가
-├── results/                     # 분석 그래프·통계표·원본 대조 결과
+├── results/                     # model_performance.csv 및 분석 결과
 └── report/
     ├── DAY2_모델평가.md          # 성능표·오류 분석·ESS 해석
     ├── DAY1_모델설계.pdf        # 12쪽 제출본
@@ -123,7 +127,8 @@ Batch 2에서 실제 수명이 학습 29셀의 범위인 534~1054사이클보다
 ```
 
 - [분석 노트북](notebooks/01_EDA.ipynb)
-- [모델링 노트북](notebooks/02_Modeling.ipynb)
+- [피처 설계 노트북](notebooks/02_feature_engineering.ipynb)
+- [모델링 노트북](notebooks/03_modeling.ipynb)
 - [DAY 2 모델 평가 보고서](report/DAY2_모델평가.md)
 - [모델 설계 보고서](report/DAY1_모델설계.pdf)
 - [압축 제출본 원고](report/DAY1_모델전략_압축.md)
@@ -140,7 +145,7 @@ python -m pip install -r requirements.txt
 python -m ipykernel install --user --name ess-day1 --display-name "ESS DAY1"
 ```
 
-Windows에서는 가상환경 활성화 명령을 `.venv\Scripts\activate`로 변경합니다. VS Code 또는 Jupyter에서 노트북을 열고 **ESS DAY1** 커널을 선택한 뒤 전체 셀을 실행합니다. DAY 2 전체 결과는 프로젝트 루트에서 `python src/day2_modeling.py --root .`로 재생성할 수도 있습니다.
+Windows에서는 가상환경 활성화 명령을 `.venv\Scripts\activate`로 변경합니다. VS Code 또는 Jupyter에서 노트북을 열고 **ESS DAY1** 커널을 선택한 뒤 전체 셀을 실행합니다. DAY 2 전체 결과는 프로젝트 루트에서 `python src/train.py --root .`로 재생성할 수도 있습니다.
 
 ### 가공 데이터로 실행
 

@@ -10,7 +10,7 @@ from sklearn.base import clone
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
-import day2_modeling as model
+import train as model
 from strategy_checks import model_inputs
 
 

@@ -96,4 +96,4 @@ Hold-out은 7셀이고 Batch 2 정책군은 9개라 추정이 불안정하다. �
 
 ## 6. 재현
 
-`python src/day2_modeling.py --root .`로 같은 CSV·PNG·보고서를 다시 생성한다. `notebooks/02_Modeling.ipynb`는 실행 과정과 결과 해석을 보여준다. 후보별 결과는 `results/day2_candidates.csv`, fold별 결과는 `results/day2_cv_folds.csv`, 셀별 예측은 `results/day2_predictions.csv`, 가이드 형식 표는 `results/day2_performance.csv`에 저장된다.
+`python src/train.py --root .`로 같은 CSV·PNG·보고서를 다시 생성한다. `notebooks/03_modeling.ipynb`는 실행 과정과 결과 해석을 보여준다. 후보별 결과는 `results/day2_candidates.csv`, fold별 결과는 `results/day2_cv_folds.csv`, 셀별 예측은 `results/day2_predictions.csv`, 가이드 형식 표는 `results/model_performance.csv`, 상세 수치는 `results/day2_performance.csv`에 저장된다.

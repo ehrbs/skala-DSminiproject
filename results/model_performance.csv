@@ -1,0 +1,9 @@
+구분,MAPE (%),비고
+Train (Batch 1 CV),7.93,5개 정책 그룹 CV fold MAPE 평균 ± 표준편차 1.88%p
+Valid (Batch 1 Hold-out),10.76,선택 후 Hold-out 7셀에서 1회 평가
+Test (Batch 2),25.69,Batch 1 전체 재학습 후 Batch 2 39셀 평가
+Gap (Train-Valid),2.83,Valid − Train CV (%p)
+Gap (Valid-Test),14.93,Batch 2 − Valid (%p)
+Gap (Target-Test),16.59,Batch 2 − 논문 비교 기준 9.1% (%p)
+Test (Batch 3),12.08,모델 변경 없이 Batch 3 44셀 추가 평가
+Gap (Batch 2-Batch 3),-13.61,Batch 3 − Batch 2 (%p)

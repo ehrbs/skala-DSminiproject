@@ -24,16 +24,10 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.compose import TransformedTargetRegressor
 
-from strategy_checks import model_inputs
+from features import FEATURE_SETS, feature_matrix
+from preprocess import load_data
 
 
-FEATURE_SETS = {
-    "G0_delta": ["log_var_delta_q"],
-    "G1_trend": ["log_var_delta_q", "qd_slope_10_100"],
-    "G2_charge": ["log_var_delta_q", "qd_slope_10_100", "mean_chargetime", "c1"],
-    "G3_thermal": ["log_var_delta_q", "qd_slope_10_100", "mean_chargetime", "c1", "mean_tavg"],
-    "G4_current": ["log_var_delta_q", "charge_rms_a"],
-}
 MODEL_ORDER = {"Ridge": 0, "ElasticNet": 1, "RandomForest": 2, "GradientBoosting": 3}
 
 
@@ -46,43 +40,6 @@ def scores(y, pred):
         "mae_cycles": mean_absolute_error(y, pred),
         "rmse_cycles": np.sqrt(mean_squared_error(y, pred)),
     }
-
-
-def group_key(frame):
-    return frame[["c1", "soc_switch", "c2"]].apply(
-        lambda r: "|".join(f"{v:g}" for v in r), axis=1
-    )
-
-
-def load_data(root):
-    root = Path(root)
-    cells = pd.read_csv(root / "data/processed/cell_features.csv")
-    current = pd.read_csv(root / "data/processed/early_current_features.csv")
-    split = pd.read_csv(root / "data/processed/batch1_split_plan.csv")
-    plan = json.loads((root / "data/processed/modeling_plan.json").read_text())
-    assert len(cells) == 139 and cells.cell_id.is_unique
-    assert len(current) == 139 and current.cell_id.is_unique
-    data = cells.merge(current.drop(columns="batch"), on="cell_id", validate="one_to_one")
-    assert set(sum(FEATURE_SETS.values(), [])) <= set(plan["input_whitelist"])
-    assert (data.early_cycles_used == 4).all() and (data.max_cycle_used == 5).all()
-    assert len(split) == plan["batch1_main_n"] == 36
-    train = data.merge(split.loc[split.partition == "train_cv", ["cell_id", "cv_fold", "policy_group"]], on="cell_id", validate="one_to_one").sort_values("cell_id").reset_index(drop=True)
-    holdout = data.merge(split.loc[split.partition == "holdout", ["cell_id", "policy_group"]], on="cell_id", validate="one_to_one").sort_values("cell_id").reset_index(drop=True)
-    eligible = data.loc[data.cycle_life.notna() & (data.cycle_life > 0) & ~data.eol_not_observed]
-    external = {}
-    for batch in ("Batch 2", "Batch 3"):
-        frame = eligible.loc[eligible.batch == batch].sort_values("cell_id").copy().reset_index(drop=True)
-        frame["policy_group"] = group_key(frame)
-        external[batch] = frame
-    assert (len(train), len(holdout), len(external["Batch 2"]), len(external["Batch 3"])) == (29, 7, 39, 44)
-    assert set(train.policy_group).isdisjoint(holdout.policy_group)
-    assert set(train.cv_fold.astype(int)) == set(range(1, 6))
-    for fold in range(1, 6):
-        v = train.cv_fold == fold
-        assert set(train.loc[v, "policy_group"]).isdisjoint(train.loc[~v, "policy_group"])
-    assert train.cycle_life.min() == plan["train_target_min"]
-    assert train.cycle_life.max() == plan["train_target_max"]
-    return train, holdout, external, plan
 
 
 def specifications():
@@ -115,7 +72,7 @@ def specifications():
 
 
 def evaluate_cv(train, spec):
-    X = model_inputs(train, spec["features"])
+    X = feature_matrix(train, spec["features"])
     y = train.cycle_life.to_numpy(dtype=float)
     folds, predictions = [], []
     for fold in range(1, 6):
@@ -268,7 +225,7 @@ def write_report(root, winner, candidate, baseline, performance, pred, ci):
               "초기 시험 신호가 신뢰할 수 있는 범위에서 예상 수명은 셀 선별·추가 시험 순서·교체 우선순위의 보조 지표가 될 수 있다. 실제 ESS 운영의 보증·안전 판단에 직접 쓰려면 운전 온도, 부분 충방전, 캘린더 열화, 제조 편차를 포함한 현장 데이터에서 다시 검증해야 한다.", "",
               "Hold-out은 7셀이고 Batch 2 정책군은 9개라 추정이 불안정하다. 종료 QD 기준은 라벨 진실성을 보증하지 않고 일부 셀을 제외해 모집단이 바뀐다. DAY 1 EDA에서 외부 배치의 라벨·분포를 이미 관찰했으므로 완전히 눈가림한 시험도 아니다. 논문의 9.1%와 직접 같은 실험으로 간주하지 않는다.", "",
               "## 6. 재현", "",
-              "`python src/day2_modeling.py --root .`로 같은 CSV·PNG·보고서를 다시 생성한다. `notebooks/02_Modeling.ipynb`는 실행 과정과 결과 해석을 보여준다. 후보별 결과는 `results/day2_candidates.csv`, fold별 결과는 `results/day2_cv_folds.csv`, 셀별 예측은 `results/day2_predictions.csv`, 가이드 형식 표는 `results/day2_performance.csv`에 저장된다.", ""]
+              "`python src/train.py --root .`로 같은 CSV·PNG·보고서를 다시 생성한다. `notebooks/03_modeling.ipynb`는 실행 과정과 결과 해석을 보여준다. 후보별 결과는 `results/day2_candidates.csv`, fold별 결과는 `results/day2_cv_folds.csv`, 셀별 예측은 `results/day2_predictions.csv`, 가이드 형식 표는 `results/model_performance.csv`, 상세 수치는 `results/day2_performance.csv`에 저장된다.", ""]
     (root / "report/DAY2_모델평가.md").write_text("\n".join(lines))
 
 
@@ -295,13 +252,13 @@ def run(root):
     assert len(cv_pred) == len(train) and cv_pred.cell_id.is_unique
     cv_frame = train.merge(cv_pred[["cell_id", "predicted"]], on="cell_id", validate="one_to_one")
     pred_parts = [prediction_frame(cv_frame, cv_frame.predicted, "CV", plan["train_target_min"], plan["train_target_max"], cv_frame.cv_fold)]
-    fitted_train = clone(winner["estimator"]).fit(model_inputs(train, winner["features"]), train.cycle_life)
-    holdout_pred = fitted_train.predict(model_inputs(holdout, winner["features"]))
+    fitted_train = clone(winner["estimator"]).fit(feature_matrix(train, winner["features"]), train.cycle_life)
+    holdout_pred = fitted_train.predict(feature_matrix(holdout, winner["features"]))
     pred_parts.append(prediction_frame(holdout, holdout_pred, "Valid", plan["train_target_min"], plan["train_target_max"]))
     full_batch1 = pd.concat([train, holdout], ignore_index=True)
-    fitted_full = clone(winner["estimator"]).fit(model_inputs(full_batch1, winner["features"]), full_batch1.cycle_life)
+    fitted_full = clone(winner["estimator"]).fit(feature_matrix(full_batch1, winner["features"]), full_batch1.cycle_life)
     for batch, frame in external.items():
-        p = fitted_full.predict(model_inputs(frame, winner["features"]))
+        p = fitted_full.predict(feature_matrix(frame, winner["features"]))
         pred_parts.append(prediction_frame(frame, p, batch, plan["train_target_min"], plan["train_target_max"]))
     pred = pd.concat(pred_parts, ignore_index=True)
     pred.to_csv(results / "day2_predictions.csv", index=False)
@@ -320,6 +277,21 @@ def run(root):
     ]
     performance = pd.DataFrame(rows)
     performance.to_csv(results / "day2_performance.csv", index=False)
+    # Guide-format summary for submission; source metrics remain in day2_performance.csv.
+    notes = [
+        f"5개 정책 그룹 CV fold MAPE 평균 ± 표준편차 {cv.cv_mape_sd_pct:.2f}%p",
+        "선택 후 Hold-out 7셀에서 1회 평가",
+        "Batch 1 전체 재학습 후 Batch 2 39셀 평가",
+        "Valid − Train CV (%p)",
+        "Batch 2 − Valid (%p)",
+        "Batch 2 − 논문 비교 기준 9.1% (%p)",
+        "모델 변경 없이 Batch 3 44셀 추가 평가",
+        "Batch 3 − Batch 2 (%p)",
+    ]
+    guide = performance[["index", "mape_pct"]].rename(columns={"index": "구분", "mape_pct": "MAPE (%)"})
+    guide["MAPE (%)"] = guide["MAPE (%)"].round(2)
+    guide["비고"] = notes
+    guide.to_csv(results / "model_performance.csv", index=False)
     ci = cluster_mape_interval(pred_parts[2])
     (results / "day2_selected_model.json").write_text(json.dumps({
         "candidate_id": winner_id, "feature_set": winner["feature_set"],
